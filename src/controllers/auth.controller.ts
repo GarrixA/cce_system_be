@@ -1,83 +1,119 @@
 import bcrypt from "bcrypt";
-import { NextFunction, Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
+import passport from "../middlewares/passport";
 import jwt from "jsonwebtoken";
-import Role_model from "../database/models/Role";
-import { User } from "../database/models/User";
 import { sendResponse } from "../utils/httpRceptions";
+import { sendEmail } from "../helpers/nodemailer";
+import HTML_TEMPLATE from "../utils/email_template";
+import {
+  UserModelAttributes,
+  TokenModelAttributes,
+  UserModelInclude,
+} from "../types/models";
+import { InfoAttribute } from "../types/passport_types";
+import { insert_function, read_function } from "../utils/db_methods";
+import { generateAccessToken, TokenData } from "../helpers/security_helpers";
+import { validateToken } from "../validations/token_validations";
+import { BASE_URL } from "../utils/keys";
+import randomatic from "randomatic";
+import { User } from "../database/models/User";
 
-const SALT_ROUNDS = 10;
-
-const ACCESS_TOKEN_SECRET =
-  process.env.ACCESS_TOKEN_SECRET || "default_secret_key";
-
-interface UserAttributes {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone_number: string;
-  role: string;
-  password: string;
-  confirmPassword: string;
-}
-
-/**
- * Function that generates token
- * @param payload
- * @returns generated token
- */
-const generateAccessToken = (payload: {
-  userId: string;
-  role: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone_number: string;
-}) => {
-  return jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: "360h" });
-};
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "secret_key_off";
 
 /**
- * Function that handles login
- * @param req
- * @param res
- * @param next
- * @returns login response
+ * REGISTER a new user and send email verification
  */
-const login = async (
+const registerUser = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ where: { email } });
+    if (req.body) {
+      passport.authenticate(
+        "register",
+        async (
+          err: Error | null,
+          user: UserModelAttributes | false,
+          info: InfoAttribute
+        ) => {
+          if (err) {
+            console.error("Passport error:", err);
+            sendResponse(
+              res,
+              500,
+              "SERVER ERROR",
+              "Registration failed",
+              err.message
+            );
+          }
 
-    if (!user) {
-      sendResponse(res, 400, "BAD REQUEST", "User not found");
-      return;
+          if (!user) {
+            console.warn("Registration failed:", info?.message);
+            return sendResponse(
+              res,
+              409,
+              "CONFLICT",
+              info?.message || "Registration failed"
+            );
+          }
+
+          req.login(user, async (loginErr) => {
+            if (loginErr) {
+              console.error("Login error:", loginErr);
+              return sendResponse(
+                res,
+                500,
+                "SERVER ERROR",
+                "Login failed",
+                loginErr.message
+              );
+            }
+
+            const token = generateAccessToken({
+              id: user.id,
+              role: user.roleId,
+            });
+
+            await insert_function<TokenModelAttributes>("Token", "create", {
+              token,
+            });
+
+            const message = `
+        <div style="...">
+          <h3>Welcome to baseFood!</h3>
+          <p>To complete your signup process, verify your account below:</p>
+          <a href="${BASE_URL}/users/account/verify/${token}" style="...">Verify</a>
+        </div>
+      `;
+
+            console.log("✅ Sending email to:", user.email);
+
+            if (!user.email) {
+              return sendResponse(
+                res,
+                500,
+                "SERVER ERROR",
+                "No email found on user object"
+              );
+            }
+
+            await sendEmail({
+              to: user.email,
+              subject: "Verify Email",
+              html: HTML_TEMPLATE(message, "Account verification"),
+            });
+
+            return sendResponse(
+              res,
+              201,
+              "SUCCESS",
+              "Account Created successfully, Please Verify your Account"
+            );
+          });
+        }
+      )(req, res, next);
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      sendResponse(res, 400, "BAD REQUEST", "Invalid password");
-      return;
-    }
-
-    const Role = Role_model(User.sequelize!);
-    const role = await Role.findOne({ where: { id: user.role } });
-    const roleName = role ? role.roleName : "Unknown";
-
-    const { id, firstName, lastName, phone_number } = user;
-    const token = generateAccessToken({
-      userId: id,
-      role: roleName,
-      firstName,
-      lastName,
-      email,
-      phone_number,
-    });
-
-    sendResponse(res, 200, "SUCCESS", "Login successful", { token });
   } catch (error) {
     sendResponse(
       res,
@@ -90,88 +126,184 @@ const login = async (
 };
 
 /**
- * Function that handles user registrations
- * @param req
- * @param res
- * @returns registered user
+ * LOGIN
  */
-const signup = async (req: Request, res: Response): Promise<void> => {
+
+const login = async (req: Request, res: Response, next: NextFunction) => {
+  passport.authenticate(
+    "login",
+    (error: Error, user: UserModelAttributes, info: InfoAttribute) => {
+      if (error) {
+        console.log("Login error details:", {
+          message: error.message,
+          stack: error.stack,
+        });
+        return sendResponse(
+          res,
+          400,
+          "BAD REQUEST",
+          `Login failed: ${error.message}`
+        );
+      }
+
+      if (info) {
+        console.log("Login info:", info);
+        return sendResponse(res, 400, "BAD REQUEST", info.message);
+      }
+
+      if (!user) {
+        return sendResponse(res, 400, "BAD REQUEST", "Invalid credentials");
+      }
+
+      req.login(user, async (err: Error) => {
+        if (err) {
+          console.log("Login Error ==========>>>>>>>", err);
+          return sendResponse(res, 400, "BAD REQUEST", "Bad Request!");
+        }
+
+        const { id, email, firstName, lastName, isPasswordExpired } = user;
+        const role = (user as UserModelInclude).Roles?.roleName;
+
+        let authenticationtoken: string;
+        let tokenData: TokenData;
+
+        if (role === "ADMIN") {
+          const otp = randomatic("0", 6);
+
+          if (isPasswordExpired) {
+            tokenData = { id, role, otp, isPasswordExpired };
+          } else {
+            tokenData = { id, role, otp };
+          }
+          authenticationtoken = generateAccessToken(tokenData);
+
+          const host = `${BASE_URL}/users`;
+          const authenticationlink = `${host}/2fa?token=${authenticationtoken}`;
+
+          const message = `Hello ${firstName + " " + lastName},<br><br>
+
+        You recently requested to loged in to basefood app. To complete the login process,Please enter the following verification code <br><br> OTP:${otp} <br><br> You can also use the following link along with the provided OTP to complete your login:<br><br> <a href ='${authenticationlink}' style="
+      background-color: MediumSeaGreen;
+      color: white;
+      padding: 6px 20px;
+      border: none;
+      border-radius: 5px;
+      text-decoration: none;
+    ">Click here to login</a> <br><br> If you didn't request this, you can safely ignore this email. Your account is secure.
+
+        Thank you,<br><br>
+        The baseFood technical Team`;
+
+          const options = {
+            to: email,
+            subject: "Your Login Verification Code",
+            html: HTML_TEMPLATE(message, "Account verification"),
+          };
+          await insert_function<TokenModelAttributes>("Token", "create", {
+            token: authenticationtoken,
+          });
+
+          sendEmail(options);
+          return sendResponse(
+            res,
+            202,
+            "ACCEPTED",
+            "Email sent for verification. Please check your inbox and enter the OTP to complete the authentication process."
+          );
+        } else {
+          if (isPasswordExpired) {
+            tokenData = { id, role, isPasswordExpired };
+          } else {
+            tokenData = { id, role };
+          }
+          authenticationtoken = generateAccessToken(tokenData);
+          return sendResponse(
+            res,
+            200,
+            "SUCCESS",
+            "Login successfully!",
+            authenticationtoken
+          );
+        }
+      });
+    }
+  )(req, res, next);
+};
+
+/**
+ * VERIFY email with token
+ */
+const accountVerify = async (req: Request, res: Response): Promise<void> => {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      phone_number,
-      password,
-      confirmPassword,
-    }: UserAttributes = req.body;
+    const token = await read_function<TokenModelAttributes>(
+      "Token",
+      "findOne",
+      {
+        where: { token: req.params.token },
+      }
+    );
 
-    const defaultUserRoleId = "11afd4f1-0bed-4a3b-8ad5-0978dabf8fcd";
-
-    if (password !== confirmPassword) {
-      res.status(400).json({ message: "Passwords do not match" });
+    if (!token) {
+      sendResponse(
+        res,
+        400,
+        "BAD REQUEST",
+        "Invalid or expired verification link"
+      );
     }
 
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      res.status(409).json({ message: "User already exsist" });
-      return;
+    const { user } = validateToken(token.token, ACCESS_TOKEN_SECRET);
+    console.log("User======>", user);
+    if (!user) {
+      sendResponse(res, 400, "BAD REQUEST", "Invalid token payload");
     }
 
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    await insert_function<UserModelAttributes>(
+      "User",
+      "update",
+      { isVerified: true },
+      { where: { id: user?.id } }
+    );
 
-    const newUser = await User.create({
-      firstName,
-      lastName,
-      email,
-      phone_number,
-      role: defaultUserRoleId,
-      password: hashedPassword,
-      confirmPassword: hashedPassword,
+    await insert_function<TokenModelAttributes>("Token", "destroy", {
+      where: { id: token.id },
     });
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: newUser.id,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        phone_number: newUser.phone_number,
-        role: req?.body?.role,
-      },
-    });
+    sendResponse(res, 200, "SUCCESS", "Email verified successfully!");
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error. Please try again later." });
+    sendResponse(
+      res,
+      500,
+      "SERVER ERROR",
+      "Verification failed",
+      (error as Error).message
+    );
   }
 };
 
 /**
- * Function gets all the users
- * @param req
- * @param res
+ * GET all users
  */
-const getUsers = async (req: Request, res: Response) => {
+const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = await User.findAll({
-      attributes: { exclude: ["password", "confirmPassword"] },
+    const users = await read_function<UserModelAttributes>("User", "findAll", {
+      where: { isDeleted: false },
+      attributes: { exclude: ["password"] },
     });
-    res.status(200).json({ data: users });
+    sendResponse(res, 200, "SUCCESS", "Users fetched", users);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Error fetching users",
-      error: (error as Error).message,
-    });
+    sendResponse(
+      res,
+      500,
+      "SERVER ERROR",
+      "Error fetching users",
+      (error as Error).message
+    );
   }
 };
 
 /**
- * Function get user by their ids
- * @param req
- * @param res
- * @returns single user
+ * GET user by ID
  */
 const getUserById = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -179,75 +311,86 @@ const getUserById = async (req: Request, res: Response): Promise<void> => {
     const user = await User.findByPk(id, {
       attributes: { exclude: ["password", "confirmPassword"] },
     });
+
     if (!user) {
-      res.status(404).json({ message: "User not found" });
+      sendResponse(res, 404, "NOT FOUND", "User not found");
     }
-    res.status(200).json({ data: user });
+
+    sendResponse(res, 200, "SUCCESS", "User fetched", user);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Error fetching user",
-      error: (error as Error).message,
-    });
+    sendResponse(
+      res,
+      500,
+      "SERVER ERROR",
+      "Error fetching user",
+      (error as Error).message
+    );
   }
 };
 
 /**
- * Function that update users info
- * @param req
- * @param res
- * @returns updated user
+ * UPDATE user
  */
 const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    console.log(id);
-    const { firstName, lastName, email, password, role } = req.body;
+    const [affectedRows] = await insert_function<
+      [number, UserModelAttributes[]]
+    >("User", "update", req.body, {
+      where: { id: req.params.id, isDeleted: false },
+    });
 
-    const hashedPassword = password
-      ? await bcrypt.hash(password, SALT_ROUNDS)
-      : undefined;
-
-    const updated = await User.update(
-      { firstName, lastName, email, password: hashedPassword, role },
-      { where: { id } }
-    );
-
-    console.log(updated, "Updated");
-
-    if (!updated) {
-      res.status(404).json({ message: "User not found" });
+    if (affectedRows === 0) {
+      sendResponse(res, 404, "NOT FOUND", "User not found or not updated");
     }
 
-    const updatedUser = await User.findByPk(id);
-    res
-      .status(200)
-      .json({ message: "User updated successfully", data: updatedUser });
+    sendResponse(res, 200, "SUCCESS", "User updated");
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Error updating user",
-      error: (error as Error).message,
-    });
+    sendResponse(
+      res,
+      500,
+      "SERVER ERROR",
+      "Error updating user",
+      (error as Error).message
+    );
   }
 };
 
-// Delete User by ID
+/**
+ * DELETE user (soft delete)
+ */
 const deleteUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    const deleted = await User.destroy({ where: { id } });
-    if (!deleted) {
-      res.status(404).json({ message: "User not found" });
+    const [affectedRows] = await insert_function<[number]>(
+      "User",
+      "update",
+      { isDeleted: true },
+      {
+        where: { id: req.params.id },
+      }
+    );
+
+    if (affectedRows === 0) {
+      sendResponse(res, 404, "NOT FOUND", "User not found or already deleted");
     }
-    res.status(200).json({ message: "User deleted successfully" });
+
+    sendResponse(res, 200, "SUCCESS", "User deleted");
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Error deleting user",
-      error: (error as Error).message,
-    });
+    sendResponse(
+      res,
+      500,
+      "SERVER ERROR",
+      "Error deleting user",
+      (error as Error).message
+    );
   }
 };
 
-export default { login, signup, getUsers, getUserById, updateUser, deleteUser };
+export default {
+  login,
+  registerUser,
+  accountVerify,
+  getUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+};

@@ -83,7 +83,7 @@ const assignRole = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    user.role = role.id;
+    user.roleId = role.id;
     await user.save();
 
     const userData = {

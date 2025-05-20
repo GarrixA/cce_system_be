@@ -5,6 +5,7 @@ import compliant_model from "./Compliants";
 import category_model from "./Category";
 import reply_model from "./Reply";
 import Organization_model from "./Organization";
+import token_model from "./Token";
 
 const Models = (sequelize: Sequelize) => {
   const User = user_model(sequelize);
@@ -13,8 +14,9 @@ const Models = (sequelize: Sequelize) => {
   const Replies = reply_model(sequelize);
   const Category = category_model(sequelize);
   const Organization = Organization_model(sequelize);
+  const Token = token_model(sequelize);
 
-  return { User, Role, Category, Compliants, Replies, Organization };
+  return { User, Role, Category, Compliants, Replies, Organization, Token };
 };
 
 export default Models;

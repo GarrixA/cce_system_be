@@ -25,7 +25,7 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      role: {
+      roleId: {
         type: Sequelize.UUID,
         allowNull: false,
       },
@@ -44,6 +44,16 @@ module.exports = {
       confirmPassword: {
         type: Sequelize.STRING,
         allowNull: false,
+      },
+      isPasswordExpired: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      isVerified: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
       },
       createdAt: {
         allowNull: false,

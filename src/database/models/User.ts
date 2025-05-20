@@ -23,11 +23,13 @@ export class User extends Model<UserModelAttributes, UserCreationAttributes> {
   public lastName!: string;
   public email!: string;
   public phone_number!: string;
-  public role!: string;
+  public roleId!: string;
   public password!: string;
   public confirmPassword!: string;
   public organization!: string;
   public reply!: string;
+  public isPasswordExpired!: boolean;
+  public isVerified!: boolean;
 
   public static associate(models: {
     Compliants: typeof database_models.Compliants;
@@ -35,6 +37,7 @@ export class User extends Model<UserModelAttributes, UserCreationAttributes> {
     Organization: typeof database_models.Organization;
     Replies: typeof database_models.Replies;
   }) {
+    User.belongsTo(models.Role, { foreignKey: "roleId", as: "Role" });
     this.hasMany(models.Compliants, {
       foreignKey: "userId",
       as: "compliants",
@@ -43,7 +46,7 @@ export class User extends Model<UserModelAttributes, UserCreationAttributes> {
       foreignKey: "reply_ownerId",
       as: "users",
     });
-    this.belongsTo(models.Role, { as: "Role", foreignKey: "role" });
+
     this.belongsTo(models.Organization, {
       as: "Organization",
       foreignKey: "organization",
@@ -73,12 +76,20 @@ const user_model = (sequelize: Sequelize) => {
         unique: true,
         type: DataTypes.STRING,
       },
+      isVerified: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       email: {
         allowNull: false,
         unique: true,
         type: DataTypes.STRING,
+        validate: {
+          isEmail: true,
+        },
       },
-      role: {
+      roleId: {
         allowNull: false,
         type: DataTypes.UUID,
         references: {
@@ -110,10 +121,15 @@ const user_model = (sequelize: Sequelize) => {
         allowNull: false,
         type: DataTypes.STRING,
       },
+      isPasswordExpired: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
     },
     {
       sequelize,
-      modelName: "User",
+      tableName: "Users",
     }
   );
   return User;

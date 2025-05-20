@@ -9,8 +9,8 @@ const router = express.Router();
 
 router.get(
   "/",
-  // athenticate.authenticateUser,
-  // athenticate.isAdmin,
+  athenticate.authenticateUser,
+  athenticate.isAdmin,
   auth.getUsers
 );
 router.get(
@@ -31,8 +31,10 @@ router.patch(
   athenticate.isAdmin,
   auth.updateUser
 );
+
+router.get("/account/verify/:token", auth.accountVerify);
 router.post("/login", validate(loginSchema), auth.login);
 
-router.post("/register", validate(signupSchema), auth.signup);
+router.post("/register", validate(signupSchema), auth.registerUser);
 
 export default router;

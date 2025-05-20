@@ -5,6 +5,9 @@ import swaggerUi from "swagger-ui-express";
 import docs from "./documantation";
 import router from "./routes/index.routes";
 import { routes_home_page } from "./utils/html.utils";
+import { SESSION_SECRET } from "./utils/keys";
+import passport from "passport";
+import session from "express-session";
 
 const app: Express = express();
 const allowedOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:3000";
@@ -20,6 +23,18 @@ app.use(
     credentials: true,
   })
 );
+
+app.set("trust proxy", 1);
+
+app.use(
+  session({
+    secret: SESSION_SECRET as string,
+    resave: false,
+    saveUninitialized: true,
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

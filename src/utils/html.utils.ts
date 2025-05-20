@@ -4,7 +4,7 @@ export const routes_home_page = `
     height: 100vh; 
     display: flex; 
     justify-content: center; 
-    align-compliants: center;
+    align-items: center;
     flex-direction: column; /* Move this property inside the style attribute */
 ">
   <h1>cce_system's Back-end</h1> 

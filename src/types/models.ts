@@ -13,11 +13,13 @@ export interface UserModelAttributes {
   userName?: string;
   email: string;
   phone_number: string;
-  role: string;
+  roleId: string;
   password: string;
   confirmPassword: string;
   organization?: string;
   reply?: string;
+  isPasswordExpired?: boolean;
+  isVerified?: boolean;
 }
 
 export interface UserModelInclude extends UserModelAttributes {
@@ -45,12 +47,15 @@ export type UserCreationAttributes = Optional<
   zipCode?: number;
 };
 
-export type ProductCreationAttributes = Omit<ProductAttributes, "id">;
-
 export interface UserModelInclude extends UserModelAttributes {
-  Roles: any;
+  Role?: {
+    id: string;
+    roleName: string;
+    [key: string]: any;
+  };
 }
 
+export type ProductCreationAttributes = Omit<ProductAttributes, "id">;
 export interface TokenModelAttributes {
   id: string;
   token: string;

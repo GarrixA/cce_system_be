@@ -2,38 +2,38 @@ import { DataTypes, Model, Sequelize, UUIDV4 } from "sequelize";
 import database_models from "../config/db.config";
 
 interface UserAttributes {
-	id?: string;
-	roleName: string;
+  id?: string;
+  roleName: string;
 }
 
 class Role extends Model<UserAttributes> implements UserAttributes {
-	public id!: string;
-	public roleName!: string;
+  public id!: string;
+  public roleName!: string;
 
-	public static associate(models: { User: typeof database_models.Role }) {
-		Role.hasMany(models.User, { foreignKey: "role", as: "users" });
-	}
+  public static associate(models: { User: typeof database_models.User }) {
+    Role.hasMany(models.User, { as: "Users", foreignKey: "roleId" });
+  }
 }
 const Role_model = (sequelize: Sequelize) => {
-	Role.init(
-		{
-			id: {
-				type: DataTypes.UUID,
-				defaultValue: UUIDV4,
-				primaryKey: true,
-				allowNull: false,
-			},
-			roleName: {
-				type: DataTypes.STRING,
-				allowNull: false,
-			},
-		},
-		{
-			sequelize,
-			tableName: "Roles",
-			modelName: "Role",
-		}
-	);
-	return Role;
+  Role.init(
+    {
+      id: {
+        type: DataTypes.UUID,
+        defaultValue: UUIDV4,
+        primaryKey: true,
+        allowNull: false,
+      },
+      roleName: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+    },
+    {
+      sequelize,
+      tableName: "Roles",
+      //   modelName: "Role",
+    }
+  );
+  return Role;
 };
 export default Role_model;

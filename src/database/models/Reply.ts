@@ -46,7 +46,7 @@ const reply_model = (sequelize: Sequelize) => {
         type: DataTypes.UUID,
         allowNull: true,
         references: {
-          model: "Replies",
+          model: "Users",
           key: "id",
         },
         onUpdate: "CASCADE",
