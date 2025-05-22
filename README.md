@@ -174,5 +174,7 @@ This is the backend API for the cce_system.
 - All endpoints requiring authentication expect an `Authorization: Bearer <token>` header.
 - Some endpoints require admin privileges.
 - For more details, see the OpenAPI/Swagger documentation in the `/src/documantation` folder.
+- https://ccesystembe-production.up.railway.app/
+- front-end repo https://github.com/GarrixA/cce_system_fe
 
 ---
