@@ -21,7 +21,7 @@ const token_model = (sequelize: Sequelize) => {
         allowNull: false,
       },
       token: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(10000),
         allowNull: false,
         unique: true,
       },

@@ -17,25 +17,18 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      phone_number: {
-        type: Sequelize.STRING,
-        allowNull: false,
-      },
       email: {
         type: Sequelize.STRING,
         allowNull: false,
+        unique: true,
       },
-      roleId: {
+      role: {
         type: Sequelize.UUID,
         allowNull: false,
-      },
-      organization: {
-        type: Sequelize.UUID,
-        allowNull: true,
-      },
-      reply: {
-        type: Sequelize.UUID,
-        allowNull: true,
+        references: {
+          model: "Roles",
+          key: "id",
+        },
       },
       password: {
         type: Sequelize.STRING,
@@ -45,15 +38,28 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
+      isVerified: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       isPasswordExpired: {
         type: Sequelize.BOOLEAN,
         allowNull: false,
         defaultValue: false,
       },
-      isVerified: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
+      phone_number: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: true,
+      },
+      organization: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "Organization",
+          key: "id",
+        },
       },
       createdAt: {
         allowNull: false,
@@ -69,7 +75,3 @@ module.exports = {
     await queryInterface.dropTable("Users");
   },
 };
-
-// 20240908101748;
-
-// 20240908133458;

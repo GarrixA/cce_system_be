@@ -1,43 +1,36 @@
 import express from "express";
+import {
+  assignCompliantOrganization,
+  createCompliant,
+  getCompliantById,
+  getCompliants,
+  getCompliantsByOrganization,
+} from "../controllers/compliant.controller";
 import athenticate from "../middlewares/authMiddleware";
-import itemController from "../controllers/compliant.controller";
+import {
+  isCompliantIdValid,
+  isCompliantValid,
+} from "../middlewares/compliantMiddleware";
 import fileUpload from "../middlewares/multers";
 
 const router = express.Router();
 
-router.post(
-  "",
+router.post("/", fileUpload.array("images"), isCompliantValid, createCompliant);
+
+router.get("/", getCompliants);
+
+router.get(
+  "/compliants/organization",
   athenticate.authenticateUser,
-  // athenticate.isAdmin,
-  fileUpload.array("images"),
-  itemController.createItem
+  getCompliantsByOrganization
 );
 
-router.get(
-  "/",
-  // athenticate.authenticateUser,
-  // athenticate.isAdmin,
-  itemController.getAllItems
-);
-
-router.get(
-  "/:id",
-  // athenticate.authenticateUser,
-  itemController.getItemById
-);
+router.get("/:id", isCompliantIdValid, getCompliantById);
 
 router.patch(
-  "/:id",
-  athenticate.authenticateUser,
-  fileUpload.array("images", 3),
-  itemController.updateItem
-);
-
-router.delete(
-  "/:id",
-  athenticate.authenticateUser,
-  // athenticate.isAdmin,
-  itemController.deleteItem
+  "/:compliantId/assign-organization",
+  // isCompliantIdValid,
+  assignCompliantOrganization
 );
 
 export default router;

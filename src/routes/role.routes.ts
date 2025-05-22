@@ -20,8 +20,8 @@ router.get(
 router.delete(
   "/roles/:id",
   athenticate.authenticateUser,
-  athenticate.isAdmin
-  // roleController.deleteRole
+  athenticate.isAdmin,
+  roleController.deleteRole
 );
 
 router.get(
@@ -33,8 +33,8 @@ router.get(
 router.post(
   "/users/:userId/roles",
   athenticate.authenticateUser,
-  athenticate.isAdmin
-  // roleController.assignRole
+  athenticate.isAdmin,
+  roleController.assignRole
 );
 
 export default router;

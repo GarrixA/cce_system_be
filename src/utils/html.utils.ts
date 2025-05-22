@@ -7,7 +7,7 @@ export const routes_home_page = `
     align-items: center;
     flex-direction: column; /* Move this property inside the style attribute */
 ">
-  <h1>cce_system's Back-end</h1> 
+  <h1>cce_system back-end</h1> 
   <p>Want to test APIs? <span style="color: MediumSeaGreen;">Click on View swagger docs.</span></p>
   <br/>
   <a

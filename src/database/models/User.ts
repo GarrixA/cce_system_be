@@ -6,50 +6,20 @@ import {
 } from "../../types/models";
 import database_models from "../config/db.config";
 
-// interface UserAttributes {
-// 	id?: string;
-// 	firstName: string;
-// 	lastName: string;
-// 	userName: string;
-// 	email: string;
-// 	role?: string;
-// 	password: string;
-// 	confirmPassword: string;
-// }
-
 export class User extends Model<UserModelAttributes, UserCreationAttributes> {
-  public id!: string;
-  public firstName!: string;
-  public lastName!: string;
-  public email!: string;
-  public phone_number!: string;
-  public roleId!: string;
-  public password!: string;
-  public confirmPassword!: string;
-  public organization!: string;
-  public reply!: string;
-  public isPasswordExpired!: boolean;
-  public isVerified!: boolean;
-
   public static associate(models: {
-    Compliants: typeof database_models.Compliants;
     Role: typeof database_models.Role;
+    Replies: any;
     Organization: typeof database_models.Organization;
-    Replies: typeof database_models.Replies;
   }) {
-    User.belongsTo(models.Role, { foreignKey: "roleId", as: "Role" });
-    this.hasMany(models.Compliants, {
-      foreignKey: "userId",
-      as: "compliants",
-    });
-    this.hasMany(models.Replies, {
+    User.belongsTo(models.Role, { as: "Roles", foreignKey: "role" });
+    User.hasMany(models.Replies, {
       foreignKey: "reply_ownerId",
-      as: "users",
+      as: "replies",
     });
-
-    this.belongsTo(models.Organization, {
-      as: "Organization",
+    User.belongsTo(models.Organization, {
       foreignKey: "organization",
+      as: "organizationInfo",
     });
   }
 }
@@ -71,45 +41,17 @@ const user_model = (sequelize: Sequelize) => {
         allowNull: false,
         type: DataTypes.STRING,
       },
-      phone_number: {
-        allowNull: false,
-        unique: true,
-        type: DataTypes.STRING,
-      },
-      isVerified: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-      },
       email: {
         allowNull: false,
         unique: true,
         type: DataTypes.STRING,
-        validate: {
-          isEmail: true,
-        },
       },
-      roleId: {
+      role: {
         allowNull: false,
         type: DataTypes.UUID,
+        defaultValue: UUIDV4,
         references: {
           model: "Roles",
-          key: "id",
-        },
-      },
-      organization: {
-        allowNull: true,
-        type: DataTypes.UUID,
-        references: {
-          model: "Organization",
-          key: "id",
-        },
-      },
-      reply: {
-        allowNull: true,
-        type: DataTypes.UUID,
-        references: {
-          model: "Replies",
           key: "id",
         },
       },
@@ -121,15 +63,34 @@ const user_model = (sequelize: Sequelize) => {
         allowNull: false,
         type: DataTypes.STRING,
       },
+      isVerified: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       isPasswordExpired: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: false,
       },
+      phone_number: {
+        allowNull: true,
+        unique: true,
+        type: DataTypes.STRING,
+      },
+
+      organization: {
+        allowNull: true,
+        type: DataTypes.UUID,
+        references: {
+          model: "Organization",
+          key: "id",
+        },
+      },
     },
     {
       sequelize,
-      tableName: "Users",
+      modelName: "User",
     }
   );
   return User;

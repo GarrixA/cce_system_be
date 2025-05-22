@@ -13,10 +13,6 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      images: {
-        type: Sequelize.ARRAY(Sequelize.STRING),
-        allowNull: false,
-      },
       description: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -31,6 +27,10 @@ module.exports = {
       },
       phone_number: {
         type: Sequelize.STRING,
+        allowNull: true,
+      },
+      images: {
+        type: Sequelize.ARRAY(Sequelize.STRING),
         allowNull: false,
       },
       categoryId: {
@@ -43,6 +43,21 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
+      organizationId: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "Organization",
+          key: "id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
+      },
+      isAnswered: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
@@ -53,7 +68,7 @@ module.exports = {
       },
     });
   },
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface) {
     await queryInterface.dropTable("Compliants");
   },
 };
