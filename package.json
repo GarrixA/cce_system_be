@@ -18,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/connect-pg-simple": "^7.0.3",
     "@types/express-session": "^1.18.1",
     "@types/node": "^22.5.0",
     "@types/nodemailer": "^6.4.17",
@@ -26,6 +27,7 @@
     "@types/randomatic": "^3.1.5",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.5.0",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^5.0.0",
