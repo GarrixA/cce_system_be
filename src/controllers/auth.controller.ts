@@ -153,47 +153,50 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
         let tokenData: TokenData;
 
         if (role === "AGENCY") {
-          const otp = randomatic("0", 6);
+          // // OTP logic commented out
+          // const otp = randomatic("0", 6);
 
           if (isPasswordExpired) {
-            tokenData = { id, role, otp, isPasswordExpired };
+            tokenData = { id, role, /* otp, */ isPasswordExpired };
           } else {
-            tokenData = { id, role, otp };
+            tokenData = { id, role /*, otp */ };
           }
           authenticationtoken = generateAccessToken(tokenData);
 
-          const host = `${BASE_URL}/users`;
-          const authenticationlink = `${host}/2fa?token=${authenticationtoken}`;
+          // const host = `${BASE_URL}/users`;
+          // const authenticationlink = `${host}/2fa?token=${authenticationtoken}`;
 
-          const message = `Hello ${firstName + " " + lastName},<br><br>
+          // const message = `Hello ${firstName + " " + lastName},<br><br>
+          // You recently requested to log in to cce_system app. To complete the login process, enter the following verification code:<br><br>
+          // OTP: ${otp}<br><br>
+          // Or click the link to complete your login:<br><br>
+          // <a href='${authenticationlink}' style="
+          // background-color: MediumSeaGreen;
+          // color: white;
+          // padding: 6px 20px;
+          // border: none;
+          // border-radius: 5px;
+          // text-decoration: none;
+          // ">Click here to login</a><br><br>
+          // If you didn't request this, you can safely ignore this email. Your account is secure.<br><br>
+          // Thank you,<br><br>The cce_system Technical Team`;
 
-        You recently requested to loged in to cce_system app. To complete the login process,Please enter the following verification code <br><br> OTP:${otp} <br><br> You can also use the following link along with the provided OTP to complete your login:<br><br> <a href ='${authenticationlink}' style="
-      background-color: MediumSeaGreen;
-      color: white;
-      padding: 6px 20px;
-      border: none;
-      border-radius: 5px;
-      text-decoration: none;
-    ">Click here to login</a> <br><br> If you didn't request this, you can safely ignore this email. Your account is secure.
+          // const options = {
+          //   to: email,
+          //   subject: "Your Login Verification Code",
+          //   html: HTML_TEMPLATE(message, "Account verification"),
+          // };
+          // await insert_function<TokenModelAttributes>("Token", "create", {
+          //   token: authenticationtoken,
+          // });
 
-        Thank you,<br><br>
-        The cce_system technical Team`;
-
-          const options = {
-            to: email,
-            subject: "Your Login Verification Code",
-            html: HTML_TEMPLATE(message, "Account verification"),
-          };
-          await insert_function<TokenModelAttributes>("Token", "create", {
-            token: authenticationtoken,
-          });
-
-          sendEmail(options);
+          // sendEmail(options);
           return sendResponse(
             res,
-            202,
-            "ACCEPTED",
-            "Email sent for verification. Please check your inbox and enter the OTP to complete the authentication process."
+            200,
+            "SUCCESS",
+            "Login successful!",
+            authenticationtoken
           );
         } else {
           if (isPasswordExpired) {
