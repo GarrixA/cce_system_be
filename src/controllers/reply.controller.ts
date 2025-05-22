@@ -1,106 +1,98 @@
 import { Request, Response } from "express";
-import { JwtPayload } from "jsonwebtoken";
-import { sequelizeConnection } from "../database/config/db.config";
-import borrower_model from "../database/models/Reply";
-import { Info } from "../types/upload";
-import { Compliants } from "../database/models/Compliants";
+import { Replies } from "../database/models/Reply";
+import { read_function, insert_function } from "../utils/db_methods";
+import { sendResponse } from "../utils/httpRceptions";
+import { BASE_URL } from "../utils/keys";
+import HTML_TEMPLATE from "../utils/email_template";
+import { sendEmail } from "../helpers/nodemailer";
+import database_models from "../database/config/db.config";
 
-export interface ExpandedRequest extends Request {
-  user?: JwtPayload;
-}
-const Reply = borrower_model(sequelizeConnection);
+const { Compliants } = database_models;
 
-const create_reply = async (
-  req: ExpandedRequest,
+// Create a Reply
+export const createReply = async (
+  req: Request,
   res: Response
 ): Promise<void> => {
-  const { reply_ownerId, reply_message, compliantId } = req.body;
-
-  const compliant = await Compliants.findByPk(compliantId);
-  if (!compliant) {
-    res
-      .status(400)
-      .json({ message: "Invalid compliantId! Item does not exist." });
-    return;
-  }
-
-  if (!reply_ownerId || !reply_message || !compliant) {
-    res.status(400).json({ message: "Required fields are missing!" });
-    return;
-  }
-
-  if ((req as Info<any>).info?.message) {
-    res.status(400).json({ message: (req as Info<any>).info.message });
-    return;
-  }
-
   try {
-    const reply = await Reply.create({
-      reply_ownerId,
+    const user = (req as any).user;
+    const { compliantId, reply_message } = req.body;
+
+    // Fetch user from DB to get organizationId
+    const dbUser = await read_function<any>("User" as any, "findOne", {
+      where: { id: user.id },
+    });
+
+    if (!dbUser || !dbUser?.dataValues?.organization) {
+      sendResponse(
+        res,
+        400,
+        "VALIDATION_ERROR",
+        "User or organizationId not found"
+      );
+      return;
+    }
+
+    // Fetch compliant and check organization match
+    const compliant = await read_function<any>("Compliants" as any, "findOne", {
+      where: {
+        id: compliantId,
+        organizationId: dbUser.dataValues.organization,
+      },
+    });
+
+    if (!compliant) {
+      sendResponse(
+        res,
+        404,
+        "NOT FOUND",
+        "Compliant not found or not in your organization"
+      );
+      return;
+    }
+
+    // Create the reply using insert_function
+    const reply = await insert_function<any>("Replies" as any, "create", {
+      reply_ownerId: user.id,
       reply_message,
       compliantId,
     });
 
-    res.status(201).json({ message: `Reply sent`, reply });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    // Update compliant status to "answered"
+    await Compliants.update(
+      { status: "answered" },
+      { where: { id: compliantId } }
+    );
 
-const update_reply = async (
-  req: ExpandedRequest,
-  res: Response
-): Promise<void> => {
-  const { id } = req.params;
-  const { reply_ownerId, reply_message, compliantId } = req.body;
+    // Send email to compliant creator
+    const creatorEmail = compliant.dataValues?.email;
+    const name = compliant.dataValues?.name || "User";
+    if (creatorEmail) {
+      const host = `${BASE_URL}/users`;
+      const message = `Hello ${name},<br><br>
+        Your compliant has received a reply:<br><br>
+        <b>Reply:</b> ${reply_message}<br><br>
+        Please check your dashboard for more details.<br><br>
+        Thank you,<br><br>
+        The cce_system Team`;
 
-  try {
-    const reply = await Reply.findByPk(id);
-    if (!reply) {
-      res.status(404).json({ message: "Reply not found!" });
-      return;
+      const options = {
+        to: creatorEmail,
+        subject: "Your Compliant Has Been Answered",
+        html: HTML_TEMPLATE(message, "Compliant Answered"),
+      };
+
+      await sendEmail(options);
     }
 
-    await reply.update({
-      reply_ownerId: reply_ownerId ?? reply.reply_ownerId,
-      reply_message: reply_message ?? reply.reply_message,
-      compliantId: compliantId ?? reply.compliantId,
-    });
-
-    res.status(200).json({ message: `Updated successfully`, reply });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    sendResponse(res, 201, "SUCCESS", "Reply created successfully", reply);
+  } catch (error) {
+    sendResponse(
+      res,
+      500,
+      "ERROR",
+      (error as Error).message || "Internal server error"
+    );
+    return;
   }
-};
-
-const get_all_replies = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const replies = await Reply.findAll();
-    res.status(200).json(replies);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const get_single_reply = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-
-  try {
-    const reply = await Reply.findByPk(id);
-    if (!reply) {
-      res.status(404).json({ message: "Reply not found!" });
-      return;
-    }
-
-    res.status(200).json(reply);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export default {
-  create_reply,
-  update_reply,
-  get_all_replies,
-  get_single_reply,
 };

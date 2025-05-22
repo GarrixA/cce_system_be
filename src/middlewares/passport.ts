@@ -3,13 +3,14 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import database_models from "../database/config/db.config";
 import { getRoleByName } from "../services/user.services";
-import { hashPassword, isValidPassword } from "../utils/passwords";
+import { hashPassword } from "../utils/passwords";
+import { isValidPassword } from "../utils/passwords";
 
-passport.serializeUser((user: any, done) => {
+passport.serializeUser(function (user: any, done) {
   done(null, user);
 });
 
-passport.deserializeUser((user: any, done) => {
+passport.deserializeUser(function (user: any, done) {
   done(null, user);
 });
 
@@ -23,8 +24,11 @@ passport.use(
     },
     async (req, email, password, done) => {
       try {
+        // console.log("🔹 Registering User:", email);
+
         const role = await getRoleByName("CITIZEN");
         if (!role) {
+          // console.error("❌ No role found!");
           return done(null, false, { message: "You are assigned to no role" });
         }
 
@@ -32,11 +36,15 @@ passport.use(
           email: email.trim(),
           password: await hashPassword(password),
           confirmPassword: await hashPassword(req.body.confirmPassword),
-          userName: req.body.userName ?? email.split("@")[0],
+          userName:
+            req.body.userName == null
+              ? req.body.email.split("@")[0]
+              : req.body.userName,
           firstName: req.body.firstName,
           lastName: req.body.lastName,
-          roleId: role.dataValues.id as string,
-          phone_number: req.body.phone_number,
+          // phone_number: req.body.phone_number,
+          role: role?.dataValues.id as string,
+          isActive: true,
           isVerified: false,
         };
 
@@ -47,14 +55,16 @@ passport.use(
         });
 
         if (userExist) {
+          // console.warn("⚠️ User already exists!");
           return done(null, false, { message: "User already exists!" });
         }
 
         const user = await database_models.User.create(data);
+        // console.log("✅ User Created Successfully:", user);
 
         return done(null, user);
       } catch (error) {
-        console.error("Register error:", error);
+        // console.error("❌ Error Registering User:", error);
         return done(error);
       }
     }
@@ -70,37 +80,36 @@ passport.use(
       passReqToCallback: true,
     },
     async (_req: Request, email, password, done) => {
+      //
       try {
         const user = await database_models.User.findOne({
           where: { email },
           include: [
             {
               model: database_models.Role,
-              as: "Role",
+              as: "Roles",
             },
           ],
         });
 
-        if (!user) {
-          return done(null, false, { message: "Wrong credentials!" });
-        }
+        const my_user = user?.toJSON();
 
-        const userJSON = user.toJSON();
-        const currPassword = userJSON.password as string;
+        if (!user) return done(null, false, { message: "Wrong credentials!" });
+
+        const currPassword = my_user?.password as string;
 
         const isValidPass = await isValidPassword(password, currPassword);
+
         if (!isValidPass) {
           return done(null, false, { message: "Wrong credentials!" });
         }
 
-        if (!userJSON.isVerified) {
+        if (!user.dataValues.isVerified) {
           return done(null, false, { message: "Verify your Account" });
         }
-
-        return done(null, userJSON);
+        return done(null, my_user);
       } catch (error) {
-        console.error("Login error:", error);
-        return done(error);
+        done(error);
       }
     }
   )

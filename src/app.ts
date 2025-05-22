@@ -3,21 +3,21 @@ import "dotenv/config";
 import express, { Express, Request, Response } from "express";
 import swaggerUi from "swagger-ui-express";
 import docs from "./documantation";
-import router from "./routes/index.routes";
+import router from "./routes";
 import { routes_home_page } from "./utils/html.utils";
-import { SESSION_SECRET } from "./utils/keys";
-import passport from "passport";
 import session from "express-session";
+import passport from "./middlewares/passport";
+import { SESSION_SECRET } from "./utils/keys";
 
 const app: Express = express();
-const allowedOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:3000";
+const allowedOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:5000";
 app.use(
   cors({
     origin: (origin, callback) => {
       if (allowedOrigins.includes(String(origin)) || !origin) {
         callback(null, true);
       } else {
-        callback(new Error("Invalid origin"));
+        callback(new Error("Your domain not supported"));
       }
     },
     credentials: true,

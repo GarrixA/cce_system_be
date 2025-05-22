@@ -1,5 +1,4 @@
 "use strict";
-
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -14,15 +13,15 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: true,
         references: {
-          model: "Users", // Should match the actual table name of your User model
+          model: "Users",
           key: "id",
         },
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
       reply_message: {
-        allowNull: false,
         type: Sequelize.STRING,
+        allowNull: false,
       },
       compliantId: {
         type: Sequelize.UUID,
@@ -37,17 +36,14 @@ module.exports = {
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("NOW()"),
       },
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("NOW()"),
       },
     });
   },
-
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface) {
     await queryInterface.dropTable("Replies");
   },
 };

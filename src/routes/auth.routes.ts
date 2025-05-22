@@ -1,9 +1,8 @@
 import express from "express";
 import auth from "../controllers/auth.controller";
-import { validate } from "../middlewares/signupMiddleware";
-import { loginSchema } from "../validations/loginValidations";
-import { signupSchema } from "../validations/signupValidations";
 import athenticate from "../middlewares/authMiddleware";
+import userMiddleware from "../middlewares/user_middleware";
+import otpIsValid from "../middlewares/otp";
 
 const router = express.Router();
 
@@ -33,8 +32,17 @@ router.patch(
 );
 
 router.get("/account/verify/:token", auth.accountVerify);
-router.post("/login", validate(loginSchema), auth.login);
+router.post("/2fa/:token", otpIsValid, auth.two_factor_authentication);
 
-router.post("/register", validate(signupSchema), auth.registerUser);
+router.post("/login", userMiddleware.isLogin_valid, auth.login);
+
+router.post("/register", userMiddleware.isRegister_valid, auth.registerUser);
+
+router.patch(
+  "/:userId/assign-organization",
+  athenticate.authenticateUser,
+  athenticate.isAdmin,
+  auth.assignUserOrganization
+);
 
 export default router;

@@ -1,6 +1,7 @@
 import { DataTypes, Model, Sequelize, UUIDV4 } from "sequelize";
 import { Category } from "./Category";
 import { Replies } from "./Reply";
+import { Organization } from "./Organization";
 
 interface ItemsAttributes {
   id?: string;
@@ -8,9 +9,11 @@ interface ItemsAttributes {
   description: string;
   images: string[];
   categoryId?: string;
+  organizationId?: string;
   status?: string;
   email?: string;
   phone_number?: string;
+  isAnswered?: boolean;
 }
 
 export class Compliants
@@ -20,19 +23,27 @@ export class Compliants
   public images!: string[];
   public id!: string;
   public categoryId!: string;
+  public organizationId!: string;
   public description!: string;
   public name!: string;
   public status!: string;
   public email!: string;
   public phone_number!: string;
+  public isAnswered!: boolean;
 
   public static associate(models: {
     Category: typeof Category;
     Replies: typeof Replies;
+    Organization: typeof Organization;
   }) {
     Compliants.belongsTo(models.Category, {
       foreignKey: "categoryId",
       as: "category",
+    });
+
+    Compliants.belongsTo(models.Organization, {
+      foreignKey: "organizationId",
+      as: "organization",
     });
 
     Compliants.hasOne(models.Replies, {
@@ -68,7 +79,7 @@ const compliant_model = (sequelize: Sequelize) => {
         type: DataTypes.STRING,
       },
       phone_number: {
-        allowNull: false,
+        allowNull: true,
         type: DataTypes.STRING,
       },
       images: {
@@ -84,6 +95,21 @@ const compliant_model = (sequelize: Sequelize) => {
         },
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
+      },
+      organizationId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+          model: "Organization",
+          key: "id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
+      },
+      isAnswered: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
       },
     },
     {

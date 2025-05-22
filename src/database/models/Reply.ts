@@ -28,7 +28,7 @@ export class Replies
     });
     Replies.belongsTo(models.User, {
       foreignKey: "reply_ownerId",
-      as: "users",
+      as: "user",
     });
   }
 }

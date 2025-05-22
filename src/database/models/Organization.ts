@@ -1,5 +1,6 @@
 import { DataTypes, Model, Sequelize, UUIDV4 } from "sequelize";
 import database_models from "../config/db.config";
+import { User } from "./User"; // Import User for typing
 
 interface OrganizationAttributes {
   id?: string;
@@ -13,20 +14,26 @@ export class Organization
   public id!: string;
   public organization_name!: string;
 
+  public users?: User[];
+
   public static associate(models: {
     User: typeof database_models.User;
     Category: typeof database_models.Category;
+    Compliants: typeof database_models.Compliants;
   }) {
-    // Organization has many Users
     this.hasMany(models.User, {
       foreignKey: "organization",
       as: "users",
     });
 
-    // Organization has many Categories
-    this.hasMany(models.Category, {
+    this.hasOne(models.Category, {
       foreignKey: "organizationId",
-      as: "categories",
+      as: "category",
+    });
+
+    this.hasMany(models.Compliants, {
+      foreignKey: "organizationId",
+      as: "compliants",
     });
   }
 }

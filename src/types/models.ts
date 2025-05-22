@@ -12,14 +12,17 @@ export interface UserModelAttributes {
   lastName: string;
   userName?: string;
   email: string;
-  phone_number: string;
-  roleId: string;
+  role?: string;
   password: string;
-  confirmPassword: string;
+  phone_number?: string;
   organization?: string;
-  reply?: string;
-  isPasswordExpired?: boolean;
+  replies?: string;
+  confirmPassword: string;
   isVerified?: boolean;
+  isPasswordExpired?: boolean;
+  lastTimePasswordUpdated?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface UserModelInclude extends UserModelAttributes {
@@ -36,7 +39,6 @@ export type UserCreationAttributes = Optional<
   phone_number?: string;
   gender?: string;
   birthDate?: Date;
-  phoneNumber?: string;
   preferredLanguage?: string;
   preferredCurrency?: string;
   profileImage?: string;
@@ -48,26 +50,12 @@ export type UserCreationAttributes = Optional<
 };
 
 export interface UserModelInclude extends UserModelAttributes {
-  Role?: {
-    id: string;
-    roleName: string;
-    [key: string]: any;
-  };
+  Roles: any;
 }
 
-export type ProductCreationAttributes = Omit<ProductAttributes, "id">;
 export interface TokenModelAttributes {
   id: string;
   token: string;
 }
 
 export type TokenCreationAttributes = Optional<TokenModelAttributes, "id">;
-
-export interface ProductAttributes {
-  id: string;
-  name: string;
-  title: number;
-  images: string[];
-  description: string;
-  userId: string;
-}

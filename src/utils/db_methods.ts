@@ -2,7 +2,7 @@
 import { CreateOptions, FindOptions, UpdateOptions } from "sequelize";
 import database_models from "../database/config/db.config";
 
-type ModelTypes = "User" | "Role" | "Token";
+type ModelTypes = "User" | "Role" | "Token" | "Category" | "Compliants";
 type MethodTypes = "findAll" | "findOne" | "destroy" | "create" | "update";
 
 export const read_function = async <T>(
@@ -55,11 +55,6 @@ export const insert_function = async <T>(
         options?: UpdateOptions
       ) => Promise<T>
     )(data, condition as UpdateOptions);
-    return result;
-  } else if (method === "destroy") {
-    const result = await (
-      database_models[model][method] as (options?: any) => Promise<T>
-    )(data);
     return result;
   } else {
     throw new Error("Invalid method type");

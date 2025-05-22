@@ -14,8 +14,9 @@ const authenticateUser = (
   next: NextFunction
 ): void => {
   const authHeader = req.headers.authorization;
+  console.log("authHeader");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ message: "Unauthorized" });
+    res.status(401).json({ message: "Unauthoriz" });
     return;
   }
 
@@ -46,7 +47,7 @@ const isAdmin = async (
   }
 
   try {
-    const user = await User.findByPk(req.user.userId);
+    const user = await User.findByPk(req?.user?.id);
     if (!user) {
       res.status(401).json({ message: "User not found" });
       return;

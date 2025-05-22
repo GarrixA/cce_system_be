@@ -11,7 +11,6 @@ export const CLOUDINARY_FOLDER_NAME = process.env.CLOUDINARY_FOLDER_NAME;
 export const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
 export const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 export const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
-export const DEFAULT_ROLE = process.env.DEFAULT_ROLE;
 
 export const SENDER_NAME = process.env.SENDER_NAME;
 export const EMAIL = process.env.EMAIL;

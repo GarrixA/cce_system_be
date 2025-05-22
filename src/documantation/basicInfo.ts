@@ -3,8 +3,8 @@ import { DEPLOYED_URL, SERVER_URL } from "../utils/keys";
 const basicInfo = {
   openapi: "3.0.0",
   info: {
-    title: "cce_system",
-    description: "cce_system api docs",
+    title: "CCE_SYSTEM API",
+    description: "cce_system api documentation",
     version: "1.0.0",
   },
 
