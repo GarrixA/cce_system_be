@@ -6,6 +6,7 @@ import docs from "./documantation";
 import router from "./routes";
 import { routes_home_page } from "./utils/html.utils";
 import session from "express-session";
+import pgSession from "connect-pg-simple";
 import passport from "./middlewares/passport";
 import { SESSION_SECRET } from "./utils/keys";
 
@@ -28,9 +29,13 @@ app.set("trust proxy", 1);
 
 app.use(
   session({
+    store: new (pgSession(session))({
+      conString: process.env.DB_DEV_URL, // or your production DB URL
+    }),
     secret: SESSION_SECRET as string,
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
+    cookie: { secure: false }, // set to true if using HTTPS
   })
 );
 app.use(passport.initialize());
