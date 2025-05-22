@@ -30,12 +30,13 @@ app.set("trust proxy", 1);
 app.use(
   session({
     store: new (pgSession(session))({
-      conString: process.env.DB_DEV_URL, // or your production DB URL
+      conString: process.env.DB_DEV_URL,
+      createTableIfMissing: true,
     }),
     secret: SESSION_SECRET as string,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }, // set to true if using HTTPS
+    cookie: { secure: false },
   })
 );
 app.use(passport.initialize());
