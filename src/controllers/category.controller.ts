@@ -1,70 +1,119 @@
 import { Request, Response } from "express";
-import { Category } from "../database/models/Category";
+import { sendResponse } from "../utils/httpRceptions";
+import { read_function, insert_function } from "../utils/db_methods";
 
-export const createCategory = async (req: Request, res: Response) => {
+interface CategoryAttributes {
+  id?: string;
+  categoryName: string;
+  organizationId: string;
+}
+
+// Create Category
+export const createCategory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const { categoryName } = req.body;
-    const newCategory = await Category.create({ categoryName });
-    res
-      .status(201)
-      .json({ message: "Category created successfully", data: newCategory });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      res
-        .status(500)
-        .json({ message: "Error creating category", error: error.message });
-    } else {
-      res
-        .status(500)
-        .json({ message: "Error creating category", error: "Unknown error" });
+    const { categoryName, organizationId } = req.body;
+    if (!organizationId) {
+      sendResponse(res, 400, "BAD REQUEST", "organizationId is required");
+      return;
     }
+
+    const organization = await read_function<any>(
+      "Organization" as any,
+      "findOne",
+      { where: { id: organizationId } }
+    );
+    if (!organization) {
+      sendResponse(res, 404, "NOT FOUND", "Organization not found");
+      return;
+    }
+
+    const existingCategory = await read_function<CategoryAttributes | null>(
+      "Category" as any,
+      "findOne",
+      { where: { organizationId } }
+    );
+    if (existingCategory) {
+      sendResponse(
+        res,
+        409,
+        "CONFLICT",
+        "Category already exists for this organization"
+      );
+      return;
+    }
+
+    const newCategory = await insert_function<CategoryAttributes>(
+      "Category" as any,
+      "create",
+      { categoryName, organizationId }
+    );
+    sendResponse(
+      res,
+      201,
+      "SUCCESS",
+      "Category created successfully",
+      newCategory
+    );
+  } catch (error) {
+    console.log("Error creating category:", error);
+    sendResponse(res, 500, "ERROR", "Internal server error");
   }
 };
 
-// Get all categories
-export const getCategories = async (req: Request, res: Response) => {
+// Get all Categories
+export const getCategories = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const categories = await Category.findAll();
-    res.status(200).json({ data: categories });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      res
-        .status(500)
-        .json({ message: "Error fetching categories", error: error.message });
-    } else {
-      res
-        .status(500)
-        .json({ message: "Error fetching categories", error: "Unknown error" });
-    }
+    const categories = await read_function<CategoryAttributes[]>(
+      "Category" as any,
+      "findAll"
+    );
+    sendResponse(
+      res,
+      200,
+      "SUCCESS",
+      "Categories fetched successfully",
+      categories
+    );
+  } catch (error) {
+    sendResponse(res, 500, "ERROR", "Internal server error");
   }
 };
 
-// Get a category by ID
+// Get single Category by ID
 export const getCategoryById = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const category = await Category.findByPk(id);
+    const category = await read_function<CategoryAttributes | null>(
+      "Category" as any,
+      "findOne",
+      { where: { id } }
+    );
     if (!category) {
-      res.status(404).json({ message: "Category not found" });
+      sendResponse(res, 404, "NOT FOUND", "Category not found");
+      return;
     }
-    res.status(200).json({ data: category });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      res
-        .status(500)
-        .json({ message: "Error fetching category", error: error.message });
-    } else {
-      res
-        .status(500)
-        .json({ message: "Error fetching category", error: "Unknown error" });
-    }
+    sendResponse(
+      res,
+      200,
+      "SUCCESS",
+      "Category fetched successfully",
+      category
+    );
+  } catch (error) {
+    sendResponse(res, 500, "ERROR", "Internal server error");
   }
 };
 
-// Update a category by ID
+// Update Category
 export const updateCategory = async (
   req: Request,
   res: Response
@@ -72,52 +121,46 @@ export const updateCategory = async (
   try {
     const { id } = req.params;
     const { categoryName } = req.body;
-    const [updated] = await Category.update(
+    const category = await read_function<CategoryAttributes | null>(
+      "Category" as any,
+      "findOne",
+      { where: { id } }
+    );
+    if (!category) {
+      sendResponse(res, 404, "NOT FOUND", "Category not found");
+      return;
+    }
+    await insert_function<CategoryAttributes>(
+      "Category" as any,
+      "update",
       { categoryName },
       { where: { id } }
     );
-    if (!updated) {
-      res.status(404).json({ message: "Category not found" });
-    }
-    const updatedCategory = await Category.findByPk(id);
-    res.status(200).json({
-      message: "Category updated successfully",
-      data: updatedCategory,
-    });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      res
-        .status(500)
-        .json({ message: "Error updating category", error: error.message });
-    } else {
-      res
-        .status(500)
-        .json({ message: "Error updating category", error: "Unknown error" });
-    }
+    sendResponse(res, 200, "SUCCESS", "Category updated successfully");
+  } catch (error) {
+    sendResponse(res, 500, "ERROR", "Internal server error");
   }
 };
 
-// Delete a category by ID
+// Delete Category
 export const deleteCategory = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const deleted = await Category.destroy({ where: { id } });
-    if (!deleted) {
-      res.status(404).json({ message: "Category not found" });
+    const category = await read_function<CategoryAttributes | null>(
+      "Category" as any,
+      "findOne",
+      { where: { id } }
+    );
+    if (!category) {
+      sendResponse(res, 404, "NOT FOUND", "Category not found");
+      return;
     }
-    res.status(200).json({ message: "Category deleted successfully" });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      res
-        .status(500)
-        .json({ message: "Error deleting category", error: error.message });
-    } else {
-      res
-        .status(500)
-        .json({ message: "Error deleting category", error: "Unknown error" });
-    }
+    await read_function<any>("Category" as any, "destroy", { where: { id } });
+    sendResponse(res, 200, "SUCCESS", "Category deleted successfully");
+  } catch (error) {
+    sendResponse(res, 500, "ERROR", "Internal server error");
   }
 };

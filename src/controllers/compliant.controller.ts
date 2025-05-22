@@ -1,138 +1,279 @@
 import { Request, Response } from "express";
-import { JwtPayload } from "jsonwebtoken";
-import { sequelizeConnection } from "../database/config/db.config";
-import Item_model from "../database/models/Compliants";
-import { deleteCloudinaryFile, uploadMultiple } from "../helpers/upload";
-import { Info } from "../types/upload";
+import { sendResponse } from "../utils/httpRceptions";
+import { read_function, insert_function } from "../utils/db_methods";
+import { ValidationError } from "sequelize";
+import { uploadMultiple } from "../helpers/upload";
 
-export interface ExpandedRequest extends Request {
-  user?: JwtPayload;
+interface CompliantAttributes {
+  id?: string;
+  name: string;
+  description: string;
+  images: string[];
+  categoryId: string;
+  status: string;
+  email: string;
+  phone_number?: string;
 }
-const Compliants = Item_model(sequelizeConnection);
 
-const createItem = async (req: Request, res: Response): Promise<void> => {
-  const { name, title, description, categoryId, email, status, phone_number } =
-    req.body;
-  const files = req.files as Express.Multer.File[];
-
-  if (!name || !title || !description) {
-    res.status(400).json({ message: "Required fields are missing!" });
-  }
-
-  const uploadedImages = await uploadMultiple(files, req);
-
-  if ((req as Info<any>).info?.message) {
-    res.status(400).json({ message: (req as Info<any>).info.message });
-  }
-
+// Create Compliant
+export const createCompliant = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const compliant = await Compliants.create({
+    // Extract files and fields from the request
+    const files = req.files as Express.Multer.File[];
+    const { name, description, email, phone_number, categoryId } = req.body;
+
+    // Validate required fields
+    if (!name || !description || !email || !categoryId) {
+      sendResponse(
+        res,
+        400,
+        "VALIDATION_ERROR",
+        "Required fields are missing!"
+      );
+      return;
+    }
+
+    // Check if categoryId exists
+    const category = await read_function<any>("Category" as any, "findOne", {
+      where: { id: categoryId },
+    });
+    if (!category) {
+      sendResponse(
+        res,
+        400,
+        "VALIDATION_ERROR",
+        "Provided categoryId does not exist."
+      );
+      return;
+    }
+
+    // Upload images to Cloudinary
+    const uploadedImages = await uploadMultiple(files, req);
+
+    // If uploadMultiple set an error message, return it
+    if ((req as any).info?.message) {
+      sendResponse(res, 400, "VALIDATION_ERROR", (req as any).info.message);
+      return;
+    }
+
+    const compliantData = {
       name,
       description,
       email,
-      status,
       phone_number,
-      images: uploadedImages.images,
       categoryId,
-    });
+      images: uploadedImages.images,
+      status: "pending",
+    };
 
-    res
-      .status(201)
-      .json({ message: `${compliant.name} is created`, compliant });
-  } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const deleteItem = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-
-  try {
-    const compliant = await Compliants.findByPk(id);
-    if (!compliant) {
-      res.status(404).json({ message: "Compliants not found!" });
-      return;
-    }
-
-    for (const imageUrl of compliant.images) {
-      await deleteCloudinaryFile(imageUrl);
-    }
-
-    await compliant.destroy();
-    res.status(200).json({ message: `Item deleted successfully!` });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const updateItem = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const { name, description, categoryId, email, status, phone_number } =
-    req.body;
-
-  try {
-    const compliant = await Compliants.findByPk(id);
-    if (!compliant) {
-      res.status(404).json({ message: "Compliants not found!" });
-      return;
-    }
-
-    let updatedImages = compliant.images;
-    if (req.files && (req.files as Express.Multer.File[]).length > 0) {
-      const uploadedImages = await uploadMultiple(
-        req.files as Express.Multer.File[],
-        req
+    const compliant = await insert_function<CompliantAttributes>(
+      "Compliants" as any,
+      "create",
+      compliantData
+    );
+    sendResponse(
+      res,
+      201,
+      "SUCCESS",
+      "Compliant created successfully",
+      compliant
+    );
+  } catch (error) {
+    console.log("Error creating compliant:", error);
+    if (error instanceof ValidationError) {
+      // Collect all error messages
+      const messages = error.errors.map((e) => e.message);
+      sendResponse(res, 400, "VALIDATION_ERROR", messages.join(", "));
+    } else {
+      sendResponse(
+        res,
+        500,
+        "ERROR",
+        (error as Error).message || "Internal server error"
       );
-      if (uploadedImages.message) {
-        res.status(400).json({ message: uploadedImages.message });
-      }
-      updatedImages = [...updatedImages, ...uploadedImages.images];
+      return;
     }
-
-    await compliant.update({
-      name: name ?? compliant.name,
-      description: description ?? compliant.description,
-      images: updatedImages,
-      categoryId: categoryId ?? compliant.categoryId,
-      email: email ?? compliant.email,
-      status: status ?? compliant.status,
-      phone_number: phone_number ?? compliant.phone_number,
-    });
-
-    res.status(200).json({ meaage: `${compliant.name} update` });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
   }
 };
 
-const getItemById = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-
+// Get all Compliants
+export const getCompliants = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const compliant = await Compliants.findByPk(id);
+    const compliants = await read_function<CompliantAttributes[]>(
+      "Compliants" as any,
+      "findAll"
+    );
+    sendResponse(
+      res,
+      200,
+      "SUCCESS",
+      "Compliants fetched successfully",
+      compliants
+    );
+  } catch (error) {
+    sendResponse(
+      res,
+      500,
+      "ERROR",
+      (error as Error).message || "Internal server error"
+    );
+    return;
+  }
+};
+
+// Get Compliants by Organization
+export const getCompliantsByOrganization = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = (req as any).user;
+    console.log("User in getCompliantsByOrganization:", user);
+    if (!user || !user.organizationId) {
+      sendResponse(
+        res,
+        400,
+        "VALIDATION_ERROR",
+        "User or organizationId not found"
+      );
+      return;
+    }
+
+    const compliants = await read_function<CompliantAttributes[]>(
+      "Compliants" as any,
+      "findAll",
+      { where: { organizationId: user.organizationId } }
+    );
+
+    sendResponse(
+      res,
+      200,
+      "SUCCESS",
+      "Compliants fetched successfully",
+      compliants
+    );
+  } catch (error) {
+    sendResponse(
+      res,
+      500,
+      "ERROR",
+      (error as Error).message || "Internal server error"
+    );
+    return;
+  }
+};
+
+// Get single Compliant by ID
+export const getCompliantById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const compliant = await read_function<CompliantAttributes | null>(
+      "Compliants" as any,
+      "findOne",
+      { where: { id } }
+    );
     if (!compliant) {
-      res.status(404).json({ message: "Item not found!" });
+      sendResponse(res, 404, "NOT FOUND", "Compliant not found");
+      return;
     }
-    res.status(200).json(compliant);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    sendResponse(
+      res,
+      200,
+      "SUCCESS",
+      "Compliant fetched successfully",
+      compliant
+    );
+  } catch (error) {
+    sendResponse(
+      res,
+      500,
+      "ERROR",
+      (error as Error).message || "Internal server error"
+    );
+    return;
   }
 };
 
-const getAllItems = async (req: Request, res: Response): Promise<void> => {
+export const assignCompliantOrganization = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const compliants = await Compliants.findAll();
-    res.status(200).json(compliants);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const { compliantId } = req.params;
 
-export default {
-  getAllItems,
-  getItemById,
-  createItem,
-  updateItem,
-  deleteItem,
+    // Find the compliant
+    const compliant = await read_function<any>("Compliants" as any, "findOne", {
+      where: { id: compliantId },
+    });
+    if (!compliant) {
+      sendResponse(res, 404, "NOT FOUND", "Compliant not found");
+      return;
+    }
+
+    // Find the organization that has a category matching compliant.categoryId
+    const category = await read_function<any>("Category" as any, "findOne", {
+      where: { id: compliant.categoryId },
+    });
+    if (!category) {
+      sendResponse(res, 404, "NOT FOUND", "Category not found");
+      return;
+    }
+
+    const organizationId = category.organizationId;
+    if (!organizationId) {
+      sendResponse(
+        res,
+        404,
+        "NOT FOUND",
+        "No organization found for this category"
+      );
+      return;
+    }
+
+    // Update compliant's organizationId and status
+    await insert_function<any>(
+      "Compliants" as any,
+      "update",
+      { organizationId, status: "processing" },
+      { where: { id: compliantId } }
+    );
+
+    // Fetch the organization to get its name
+    const organization = await read_function<any>(
+      "Organization" as any,
+      "findOne",
+      { where: { id: organizationId } }
+    );
+
+    sendResponse(
+      res,
+      200,
+      "SUCCESS",
+      `Compliant assigned to ${
+        organization?.organization_name || "Organization"
+      }`,
+      {
+        compliantId,
+        organizationId,
+        organization_name: organization?.organization_name || null,
+      }
+    );
+  } catch (error) {
+    sendResponse(
+      res,
+      500,
+      "ERROR",
+      (error as Error).message || "Internal server error"
+    );
+    return;
+  }
 };

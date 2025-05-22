@@ -1,4 +1,4 @@
-import { DataTypes, Model, Sequelize, UUIDV4 } from "sequelize";
+import { DataTypes, Model, Optional, Sequelize, UUIDV4 } from "sequelize";
 import database_models from "../config/db.config";
 
 interface UserAttributes {
@@ -6,14 +6,13 @@ interface UserAttributes {
   roleName: string;
 }
 
-class Role extends Model<UserAttributes> implements UserAttributes {
-  public id!: string;
-  public roleName!: string;
-
+type RoleCreationAtribute = Optional<UserAttributes, "id">;
+class Role extends Model<UserAttributes, RoleCreationAtribute> {
   public static associate(models: { User: typeof database_models.User }) {
-    Role.hasMany(models.User, { as: "Users", foreignKey: "roleId" });
+    Role.hasMany(models.User, { as: "User", foreignKey: "role" });
   }
 }
+
 const Role_model = (sequelize: Sequelize) => {
   Role.init(
     {
@@ -31,7 +30,6 @@ const Role_model = (sequelize: Sequelize) => {
     {
       sequelize,
       tableName: "Roles",
-      //   modelName: "Role",
     }
   );
   return Role;

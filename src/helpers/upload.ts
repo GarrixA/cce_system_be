@@ -34,13 +34,13 @@ export const uploadMultiple = async (
   const errors: string[] = [];
 
   // Validate the number of images
-  if (!images || images.length < 3 || images.length > 8) {
+  if (!images || images.length < 1 || images.length > 8) {
     (req as Info<Message>).info = {
       message: !images
         ? "No images were provided!"
-        : images.length < 3
-        ? "Compliants must have at least 3 images!"
-        : "Compliants can't have more than 8 images!",
+        : images.length < 1
+        ? "At least one image is required!"
+        : "Items can't have more than 8 images!",
     };
     return { images: [] }; // Return empty images array on validation failure
   }
@@ -67,11 +67,11 @@ export const uploadMultiple = async (
   if (errors.length > 0) {
     return {
       images: imageUrls,
-      message: message(imageUrls.length, errors) as string, // Concatenate messages as needed
+      message: message(imageUrls.length, errors) as string,
     };
   }
 
-  return { images: imageUrls }; // Return the successfully uploaded image URLs
+  return { images: imageUrls };
 };
 
 export const deleteCloudinaryFile = async (url: string) => {

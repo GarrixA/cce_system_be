@@ -33,8 +33,8 @@ const dialect_option = isLocal
   ? {}
   : {
       ssl: {
-        require: true,
-        rejectUnauthorized: false,
+        require: sslRequired,
+        rejectUnauthorized: process.env.SSL === "false" ? false : true,
       },
     };
 

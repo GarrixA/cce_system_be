@@ -1,27 +1,39 @@
 import bcrypt from "bcrypt";
-import { Request, Response, NextFunction } from "express";
-import passport from "../middlewares/passport";
-import jwt from "jsonwebtoken";
-import { sendResponse } from "../utils/httpRceptions";
+import { NextFunction, Request, Response } from "express";
+import randomatic from "randomatic";
+import { User } from "../database/models/User";
 import { sendEmail } from "../helpers/nodemailer";
-import HTML_TEMPLATE from "../utils/email_template";
 import {
-  UserModelAttributes,
+  generateAccessToken,
+  TokenData,
+  verifyAccessToken,
+} from "../helpers/security_helpers";
+import passport from "../middlewares/passport";
+import {
   TokenModelAttributes,
+  UserModelAttributes,
   UserModelInclude,
 } from "../types/models";
 import { InfoAttribute } from "../types/passport_types";
 import { insert_function, read_function } from "../utils/db_methods";
-import { generateAccessToken, TokenData } from "../helpers/security_helpers";
-import { validateToken } from "../validations/token_validations";
+import HTML_TEMPLATE from "../utils/email_template";
+import { sendResponse } from "../utils/httpRceptions";
 import { BASE_URL } from "../utils/keys";
-import randomatic from "randomatic";
-import { User } from "../database/models/User";
+import { validateToken } from "../validations/token_validations";
+import database_models from "../database/config/db.config";
+const { Role } = database_models;
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "secret_key_off";
+const SALT_ROUNDS = 10;
+
+const ACCESS_TOKEN_SECRET =
+  process.env.ACCESS_TOKEN_SECRET || "default_secret_key";
 
 /**
- * REGISTER a new user and send email verification
+ * Function that handles user registration
+ * @param req
+ * @param res
+ * @param next
+ * @returns registered user
  */
 const registerUser = async (
   req: Request,
@@ -32,79 +44,57 @@ const registerUser = async (
     if (req.body) {
       passport.authenticate(
         "register",
-        async (
-          err: Error | null,
-          user: UserModelAttributes | false,
-          info: InfoAttribute
-        ) => {
+        (err: Error, user: UserModelAttributes, info: InfoAttribute) => {
           if (err) {
-            console.error("Passport error:", err);
-            sendResponse(
-              res,
-              500,
-              "SERVER ERROR",
-              "Registration failed",
-              err.message
-            );
+            sendResponse(res, 400, "BAD REQUEST", "Missing an attribute");
+            return;
           }
-
+          if (info) {
+            sendResponse(res, 409, "CONFLICT", info.message);
+            return;
+          }
           if (!user) {
-            console.warn("Registration failed:", info?.message);
-            return sendResponse(
-              res,
-              409,
-              "CONFLICT",
-              info?.message || "Registration failed"
-            );
+            sendResponse(res, 400, "BAD REQUEST", "User registration failed");
+            return;
           }
 
-          req.login(user, async (loginErr) => {
-            if (loginErr) {
-              console.error("Login error:", loginErr);
-              return sendResponse(
-                res,
-                500,
-                "SERVER ERROR",
-                "Login failed",
-                loginErr.message
-              );
-            }
-
+          req.login(user, async () => {
             const token = generateAccessToken({
-              id: user.id,
-              role: user.roleId,
+              id: user?.id,
+              role: user?.role!,
             });
-
             await insert_function<TokenModelAttributes>("Token", "create", {
               token,
             });
-
             const message = `
-        <div style="...">
-          <h3>Welcome to baseFood!</h3>
-          <p>To complete your signup process, verify your account below:</p>
-          <a href="${BASE_URL}/users/account/verify/${token}" style="...">Verify</a>
-        </div>
-      `;
-
-            console.log("✅ Sending email to:", user.email);
-
-            if (!user.email) {
-              return sendResponse(
-                res,
-                500,
-                "SERVER ERROR",
-                "No email found on user object"
-              );
-            }
-
+                        <div style="max-width: 600px;
+    margin: 0 auto;
+    background-color: #ffffff;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;">
+        <h3 style="color: #333333;">Welcome to cce_system!</h3>
+        <p>To complete your signup process, please verify your account by clicking the link below:</p> <br/> <br/>
+        <a href="${BASE_URL}/users/account/verify/${token}" style="
+      background-color: MediumSeaGreen;
+      color: white;
+      padding: 6px 20px;
+      border: none;
+      border-radius: 5px;
+      text-decoration: none;
+    ">Verify</a> <br/> <br/>
+        <p>Thank you for joining us!</p>
+        <p>Best regards,</p>
+        <p>The cce_system Technical Team</p>
+    </div>
+                        `;
+            console.log("Ussssssseeeerrrr ============>>>>", user);
             await sendEmail({
-              to: user.email,
+              to: user?.email,
               subject: "Verify Email",
               html: HTML_TEMPLATE(message, "Account verification"),
             });
-
-            return sendResponse(
+            sendResponse(
               res,
               201,
               "SUCCESS",
@@ -126,28 +116,23 @@ const registerUser = async (
 };
 
 /**
- * LOGIN
+ * A function that handles user login
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ *  - If the user is an agency, it sends a verification email with a link and OTP.
  */
-
 const login = async (req: Request, res: Response, next: NextFunction) => {
   passport.authenticate(
     "login",
     (error: Error, user: UserModelAttributes, info: InfoAttribute) => {
       if (error) {
-        console.log("Login error details:", {
-          message: error.message,
-          stack: error.stack,
-        });
-        return sendResponse(
-          res,
-          400,
-          "BAD REQUEST",
-          `Login failed: ${error.message}`
-        );
+        console.log("The error is =======>>>>", error);
+        return sendResponse(res, 400, "BAD REQUEST", "Missing an attribute");
       }
 
       if (info) {
-        console.log("Login info:", info);
         return sendResponse(res, 400, "BAD REQUEST", info.message);
       }
 
@@ -167,7 +152,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
         let authenticationtoken: string;
         let tokenData: TokenData;
 
-        if (role === "ADMIN") {
+        if (role === "AGENCY") {
           const otp = randomatic("0", 6);
 
           if (isPasswordExpired) {
@@ -182,7 +167,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 
           const message = `Hello ${firstName + " " + lastName},<br><br>
 
-        You recently requested to loged in to basefood app. To complete the login process,Please enter the following verification code <br><br> OTP:${otp} <br><br> You can also use the following link along with the provided OTP to complete your login:<br><br> <a href ='${authenticationlink}' style="
+        You recently requested to loged in to cce_system app. To complete the login process,Please enter the following verification code <br><br> OTP:${otp} <br><br> You can also use the following link along with the provided OTP to complete your login:<br><br> <a href ='${authenticationlink}' style="
       background-color: MediumSeaGreen;
       color: white;
       padding: 6px 20px;
@@ -192,7 +177,7 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
     ">Click here to login</a> <br><br> If you didn't request this, you can safely ignore this email. Your account is secure.
 
         Thank you,<br><br>
-        The baseFood technical Team`;
+        The cce_system technical Team`;
 
           const options = {
             to: email,
@@ -231,79 +216,74 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 /**
- * VERIFY email with token
+ * Function that handles user account verification
+ * @param req
+ * @param res
+ * @returns verified user
  */
 const accountVerify = async (req: Request, res: Response): Promise<void> => {
   try {
     const token = await read_function<TokenModelAttributes>(
       "Token",
       "findOne",
-      {
-        where: { token: req.params.token },
-      }
+      { where: { token: req.params.token } }
     );
-
     if (!token) {
-      sendResponse(
-        res,
-        400,
-        "BAD REQUEST",
-        "Invalid or expired verification link"
-      );
+      sendResponse(res, 404, "NOT FOUND", "Token not found");
     }
 
-    const { user } = validateToken(token.token, ACCESS_TOKEN_SECRET);
-    console.log("User======>", user);
+    const { user } = validateToken(token.token, ACCESS_TOKEN_SECRET as string);
     if (!user) {
-      sendResponse(res, 400, "BAD REQUEST", "Invalid token payload");
+      sendResponse(res, 400, "BAD REQUEST", "Invalid token");
+      return;
     }
-
     await insert_function<UserModelAttributes>(
       "User",
       "update",
       { isVerified: true },
-      { where: { id: user?.id } }
+      { where: { id: user.id } }
     );
-
-    await insert_function<TokenModelAttributes>("Token", "destroy", {
+    await read_function<TokenModelAttributes>("Token", "destroy", {
       where: { id: token.id },
     });
-
     sendResponse(res, 200, "SUCCESS", "Email verified successfully!");
   } catch (error) {
     sendResponse(
       res,
       500,
       "SERVER ERROR",
-      "Verification failed",
+      "Something went wrong!",
       (error as Error).message
     );
   }
 };
 
 /**
- * GET all users
+ * Function that fetches all users
+ * @param req
+ * @param res
+ * @returns all users
  */
-const getUsers = async (req: Request, res: Response): Promise<void> => {
+const getUsers = async (req: Request, res: Response) => {
   try {
-    const users = await read_function<UserModelAttributes>("User", "findAll", {
-      where: { isDeleted: false },
-      attributes: { exclude: ["password"] },
+    const users = await User.findAll({
+      attributes: { exclude: ["password", "confirmPassword"] },
     });
-    sendResponse(res, 200, "SUCCESS", "Users fetched", users);
+    res.status(200).json({ data: users });
   } catch (error) {
-    sendResponse(
-      res,
-      500,
-      "SERVER ERROR",
-      "Error fetching users",
-      (error as Error).message
-    );
+    console.error(error);
+    res.status(500).json({
+      message: "Error fetching users",
+      error: (error as Error).message,
+    });
   }
 };
 
 /**
- * GET user by ID
+ * Function get user by their ids
+ * @param req
+ * @param res
+ * @returns single user
  */
 const getUserById = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -311,75 +291,191 @@ const getUserById = async (req: Request, res: Response): Promise<void> => {
     const user = await User.findByPk(id, {
       attributes: { exclude: ["password", "confirmPassword"] },
     });
-
     if (!user) {
-      sendResponse(res, 404, "NOT FOUND", "User not found");
+      res.status(404).json({ message: "User not found" });
+      return;
     }
-
-    sendResponse(res, 200, "SUCCESS", "User fetched", user);
+    res.status(200).json({ data: user });
   } catch (error) {
-    sendResponse(
-      res,
-      500,
-      "SERVER ERROR",
-      "Error fetching user",
-      (error as Error).message
-    );
+    console.error(error);
+    res.status(500).json({
+      message: "Error fetching user",
+      error: (error as Error).message,
+    });
   }
 };
 
 /**
- * UPDATE user
+ * Function that update users info
+ * @param req
+ * @param res
+ * @returns updated user
  */
 const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [affectedRows] = await insert_function<
-      [number, UserModelAttributes[]]
-    >("User", "update", req.body, {
-      where: { id: req.params.id, isDeleted: false },
-    });
+    const { id } = req.params;
+    console.log(id);
+    const { firstName, lastName, email, password, role } = req.body;
 
-    if (affectedRows === 0) {
-      sendResponse(res, 404, "NOT FOUND", "User not found or not updated");
+    const hashedPassword = password
+      ? await bcrypt.hash(password, SALT_ROUNDS)
+      : undefined;
+
+    const updated = await User.update(
+      { firstName, lastName, email, password: hashedPassword },
+      { where: { id } }
+    );
+
+    console.log(updated, "Updated");
+
+    if (!updated) {
+      res.status(404).json({ message: "User not found" });
     }
 
-    sendResponse(res, 200, "SUCCESS", "User updated");
+    const updatedUser = await User.findByPk(id);
+    res
+      .status(200)
+      .json({ message: "User updated successfully", data: updatedUser });
   } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Error updating user",
+      error: (error as Error).message,
+    });
+  }
+};
+
+/**
+ * Function that deletes user
+ * @param req
+ * @param res
+ * @returns deleted user
+ */
+const deleteUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const deleted = await User.destroy({ where: { id } });
+    if (!deleted) {
+      res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Error deleting user",
+      error: (error as Error).message,
+    });
+  }
+};
+
+/**
+ * Function that handles two factor authentication
+ * @param req
+ * @param res
+ * @returns verified user
+ */
+const two_factor_authentication = async (req: Request, res: Response) => {
+  try {
+    const { otp } = req.body;
+    const { token } = req.params;
+    const decodedToken = verifyAccessToken(token, res) as TokenData;
+    if (decodedToken.otp) {
+      if (decodedToken.otp && otp === decodedToken.otp) {
+        await read_function<TokenModelAttributes>("Token", "destroy", {
+          where: { token: token },
+        });
+        sendResponse(res, 200, "SUCCESS", "OTP verified!", token);
+      } else {
+        sendResponse(res, 400, "BAD REQUEST", "Invalid OTP");
+      }
+    }
+  } catch (error: any) {
     sendResponse(
       res,
       500,
       "SERVER ERROR",
-      "Error updating user",
+      "Something went wrong!",
       (error as Error).message
     );
   }
 };
 
 /**
- * DELETE user (soft delete)
+ * Function that assigns an organization to a user
+ * @param req
+ * @param res
+ * @returns assigned organization
  */
-const deleteUser = async (req: Request, res: Response): Promise<void> => {
+const assignUserOrganization = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const [affectedRows] = await insert_function<[number]>(
-      "User",
-      "update",
-      { isDeleted: true },
-      {
-        where: { id: req.params.id },
-      }
-    );
+    const { userId } = req.params;
+    const { organization_name } = req.body;
 
-    if (affectedRows === 0) {
-      sendResponse(res, 404, "NOT FOUND", "User not found or already deleted");
+    if (!organization_name) {
+      sendResponse(res, 400, "BAD REQUEST", "organization_name is required");
+      return;
+    }
+    console.log("User ID:", userId);
+    // Find user and their role
+    const user = await User.findByPk(userId, {
+      include: [{ model: Role, as: "Roles" }],
+    });
+
+    console.log("User found:", user);
+
+    if (!user) {
+      sendResponse(res, 404, "NOT FOUND", "User not found");
+      return;
     }
 
-    sendResponse(res, 200, "SUCCESS", "User deleted");
+    // Access roleName safely
+    const roleInstance = (user as any).Roles;
+    const roleName = roleInstance?.roleName;
+    if (roleName !== "AGENCY") {
+      sendResponse(
+        res,
+        403,
+        "FORBIDDEN",
+        "Only AGENCY users can be assigned an organization"
+      );
+      return;
+    }
+
+    // Find or create organization by name
+    let organization = await read_function<any>(
+      "Organization" as any,
+      "findOne",
+      { where: { organization_name } }
+    );
+
+    if (!organization) {
+      organization = await insert_function<any>(
+        "Organization" as any,
+        "create",
+        { organization_name }
+      );
+    }
+
+    // Update user's organization field
+    await User.update(
+      { organization: organization.id },
+      { where: { id: userId } }
+    );
+
+    sendResponse(res, 200, "SUCCESS", "Organization assigned to user", {
+      userId,
+      organizationId: organization.id,
+      organization_name: organization.organization_name,
+    });
   } catch (error) {
     sendResponse(
       res,
       500,
-      "SERVER ERROR",
-      "Error deleting user",
+      "ERROR",
+      "Internal server error",
       (error as Error).message
     );
   }
@@ -388,9 +484,11 @@ const deleteUser = async (req: Request, res: Response): Promise<void> => {
 export default {
   login,
   registerUser,
-  accountVerify,
   getUsers,
   getUserById,
   updateUser,
   deleteUser,
+  accountVerify,
+  two_factor_authentication,
+  assignUserOrganization,
 };

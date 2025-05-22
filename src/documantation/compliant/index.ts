@@ -1,209 +1,80 @@
 import { responses } from "../responses";
 
-const createItem = {
-  tags: ["Compliant"],
-  security: [{ bearerAuth: [] }],
-  summary: "Creating an compliant",
-  requestBody: {
-    required: true,
-    content: {
-      "multipart/form-data": {
-        schema: {
-          type: "object",
-          required: [
-            "name",
-            "title",
-            "description",
-            "categoryId",
-            "status",
-            "condition",
-          ],
-          properties: {
-            name: {
-              type: "string",
-              description: "Compliant name",
-              example: "Laptop",
-            },
-            title: {
-              type: "string",
-              description: "Compliant title",
-              example: "High-End Laptop",
-            },
-            description: {
-              type: "string",
-              description: "Detailed description of the compliant",
-              example: "A powerful laptop with 16GB RAM and 1TB SSD.",
-            },
-            status: {
-              type: "string",
-              description: "Availability status of the compliant",
-              enum: ["available", "out_of_stock", "reserved"],
-              example: "available",
-            },
-            condition: {
-              type: "string",
-              description: "Condition of the compliant",
-              enum: ["new", "used", "good", "damaged"],
-              example: "good",
-            },
-            serial_number: {
-              type: "string",
-              description: "Serial number of the compliant",
-              example: "Was21f34L",
-            },
-            images: {
-              type: "array",
-              compliants: {
-                type: "file",
+const compliant_routes = {
+  create_compliant: {
+    tags: ["Compliant"],
+    summary: "Create Compliant",
+    security: [],
+    requestBody: {
+      required: true,
+      content: {
+        "multipart/form-data": {
+          schema: {
+            type: "object",
+            properties: {
+              name: { type: "string", example: "Spoiled food" },
+              description: {
+                type: "string",
+                example: "The food was spoiled and inedible.",
               },
-              minItems: 4,
+              email: { type: "string", example: "user@example.com" },
+              phone_number: { type: "string", example: "+1234567890" },
+              images: {
+                type: "array",
+                items: {
+                  type: "string",
+                  format: "binary",
+                },
+              },
+              categoryId: { type: "string", example: "uuid-category-id" },
             },
-            categoryId: {
-              type: "string",
-              description: "Compliant category ID",
-              format: "uuid",
-              example: "8efe453c-b779-453c-b96e-afe656eeebab",
-            },
+            required: ["name", "description", "email", "images", "categoryId"],
           },
         },
       },
     },
-  },
-  consumes: ["multipart/form-data"],
-  responses,
-};
-
-const read_items = {
-  all: {
-    tags: ["Compliant"],
-    security: [{ bearerAuth: [] }],
-    summary: "Retrieve all compliants",
-    description: "Get a list of all compliants",
     responses,
   },
-  single: {
+  read_all: {
     tags: ["Compliant"],
     security: [{ bearerAuth: [] }],
-    summary: "Retrieve a single compliant",
-    description: "Fetch a single compliant by its ID",
+    summary: "Get all Compliants",
+    responses,
+  },
+  read_single: {
+    tags: ["Compliant"],
+    security: [{ bearerAuth: [] }],
+    summary: "Get single Compliant",
     parameters: [
       {
         in: "path",
         name: "id",
         required: true,
-        schema: {
-          type: "string",
-          format: "uuid",
-        },
+        description: "ID of the compliant to retrieve",
+        schema: { type: "string" },
       },
     ],
     responses,
   },
-};
-
-const update_item = {
-  tags: ["Compliant"],
-  security: [{ bearerAuth: [] }],
-  summary: "Update an compliant",
-  parameters: [
-    {
-      in: "path",
-      name: "id",
-      required: true,
-      schema: {
-        type: "string",
-        format: "uuid",
-      },
-    },
-  ],
-  requestBody: {
-    required: true,
-    content: {
-      "multipart/form-data": {
-        schema: {
-          type: "object",
-          required: [
-            "name",
-            "title",
-            "description",
-            "categoryId",
-            "status",
-            "condition",
-          ],
-          properties: {
-            name: {
-              type: "string",
-              description: "Compliant name",
-              example: "Laptop",
-            },
-            title: {
-              type: "string",
-              description: "Compliant title",
-              example: "Gaming Laptop",
-            },
-            description: {
-              type: "string",
-              description: "Detailed description of the compliant",
-              example: "An upgraded gaming laptop with RTX 4090.",
-            },
-            status: {
-              type: "string",
-              description: "Availability status of the compliant",
-              enum: ["available", "out_of_stock", "reserved"],
-              example: "available",
-            },
-            condition: {
-              type: "string",
-              description: "Condition of the compliant",
-              enum: ["new", "used", "good", "damaged"],
-              example: "good",
-            },
-            images: {
-              type: "array",
-              compliants: {
-                type: "file",
-              },
-              minItems: 4,
-            },
-            categoryId: {
-              type: "string",
-              description: "Compliant category ID",
-              format: "uuid",
-            },
-          },
-        },
-      },
-    },
+  read_by_organization: {
+    tags: ["Compliant"],
+    security: [{ bearerAuth: [] }],
+    summary: "Get Compliants by Organization",
+    description:
+      "Returns all compliants where the organizationId matches the authenticated user's organizationId.",
+    responses,
   },
-  responses,
-};
-
-const delete_item = {
-  tags: ["Compliant"],
-  security: [{ bearerAuth: [] }],
-  summary: "Delete an compliant",
-  parameters: [
-    {
-      in: "path",
-      name: "id",
-      required: true,
-      schema: {
-        type: "string",
-        format: "uuid",
-      },
-    },
-  ],
-  responses,
 };
 
 export const compliants = {
   "/api/v1/compliants": {
-    post: createItem,
-    get: read_items.all,
+    post: compliant_routes["create_compliant"],
+    get: compliant_routes["read_all"],
+  },
+  "/api/v1/compliants/organization": {
+    get: compliant_routes["read_by_organization"],
   },
   "/api/v1/compliants/{id}": {
-    get: read_items.single,
-    patch: update_item,
-    delete: delete_item,
+    get: compliant_routes["read_single"],
   },
 };

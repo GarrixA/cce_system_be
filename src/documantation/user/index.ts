@@ -23,10 +23,6 @@ const user_routes = {
                 type: "string",
                 example: "kalisa",
               },
-              phone_number: {
-                type: "string",
-                example: "0781234567",
-              },
               password: {
                 type: "string",
                 example: "passwordQWE123",
@@ -36,6 +32,13 @@ const user_routes = {
                 example: "passwordQWE123",
               },
             },
+            required: [
+              "email",
+              "firstName",
+              "lastName",
+              "password",
+              "confirmPassword",
+            ],
           },
         },
       },
@@ -62,6 +65,7 @@ const user_routes = {
                 example: "passwordQWE123",
               },
             },
+            required: ["email", "password"],
           },
         },
       },
@@ -175,6 +179,74 @@ const user_routes = {
     ],
     responses,
   },
+
+  two_factor_auth: {
+    tags: ["User"],
+    summary: "Verify user login with OTP (2FA)",
+    parameters: [
+      {
+        in: "path",
+        name: "token",
+        required: true,
+        schema: {
+          type: "string",
+        },
+        description: "2FA authentication token",
+      },
+    ],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              otp: {
+                type: "string",
+                example: "123456",
+                description: "One Time Password sent to the user",
+              },
+            },
+            required: ["otp"],
+          },
+        },
+      },
+    },
+    responses,
+  },
+
+  assign_organization: {
+    tags: ["User", "Organization"],
+    summary: "Assign an organization to a user (AGENCY only)",
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        in: "path",
+        name: "userId",
+        required: true,
+        schema: { type: "string" },
+        description: "User ID",
+      },
+    ],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              organization_name: {
+                type: "string",
+                example: "cce_system Org",
+              },
+            },
+            required: ["organization_name"],
+          },
+        },
+      },
+    },
+    responses,
+  },
 };
 
 export const users = {
@@ -197,5 +269,11 @@ export const users = {
   },
   "/api/v1/users/account/verify/{token}": {
     get: user_routes["verify_account"],
+  },
+  "/api/v1/users/2fa/{token}": {
+    post: user_routes["two_factor_auth"],
+  },
+  "/api/v1/users/{userId}/assign-organization": {
+    patch: user_routes["assign_organization"],
   },
 };

@@ -5,6 +5,7 @@ import { Compliants } from "./Compliants";
 interface CategoryAttributes {
   id?: string;
   categoryName: string;
+  organizationId: string;
 }
 
 export class Category
@@ -13,11 +14,21 @@ export class Category
 {
   public id!: string;
   public categoryName!: string;
+  public organizationId!: string;
 
-  public static associate(models: { Compliants: typeof Compliants }) {
+  public static associate(models: {
+    Compliants: typeof Compliants;
+    Organization: typeof database_models.Organization;
+  }) {
     this.hasMany(models.Compliants, {
       foreignKey: "categoryId",
       as: "compliants",
+    });
+
+    // Category belongs to Organization (One-to-One)
+    this.belongsTo(models.Organization, {
+      foreignKey: "organizationId",
+      as: "organization",
     });
   }
 }
@@ -34,6 +45,11 @@ const category_model = (sequelize: Sequelize) => {
       categoryName: {
         type: DataTypes.STRING,
         allowNull: false,
+      },
+      organizationId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        unique: true,
       },
     },
     {
